@@ -1,11 +1,16 @@
-#define input_count 10 
+#define input_count 10
 #define trainingData_count 0
 #define layer_count 3
+#define mnist_location "mnist/"
 
 
 #include <iostream>
 #include <math.h>
 #include <vector>
+#include <fstream>
+
+#include "mnist/include/mnist/mnist_reader.hpp"
+#include "mnist/include/mnist/mnist_utils.hpp"
 
 enum class LossFunction {
 	//regression losses
@@ -20,7 +25,7 @@ enum class Functions {
 	Sigmoind = 0,  //used to predict propability
 	Tanh = 1,
 	//HyperBolicTangent,
-	ReLu = 2, 
+	ReLu = 2,
 	Identity = 3,
 	Step = 4
 };
@@ -39,7 +44,7 @@ class Math {
 
 
 class Log {
-public: 
+public:
 	void logFloatPointerArray(float* arr, int size) {
 		std::ios_base::sync_with_stdio(false);
 
@@ -56,6 +61,7 @@ private:
 	Math math;
 	Functions activation;
 	float bias;
+	Log log;
 public:
 	float* weight;
 	float output;
@@ -74,14 +80,14 @@ public:
 	}
 	void Run(float* inputs, unsigned int n_input) {
 		bOutput = 0;
-		
+
 		for (unsigned int i = 0; i < n_input; i++)
 		{
 			bOutput += inputs[i] * weight[i];
 		}
-		
+
 		bOutput += bias;
-		
+
 		switch (activation)
 		{
 		case Functions::Sigmoind:
@@ -110,31 +116,70 @@ public:
 			output = ((float)exp(bOutput)-(float)exp(-bOutput))/((float)exp(bOutput)+(float)exp(-bOutput));
 		}
 	}
-	void Train(int target, float* prevOutput, int n_input, float learningRate, bool outputLayer, float* oldG, int G_count, float* oldWeights){
+	void Train(int target, float* prevOutput, int n_input, float learningRate, bool outputLayer, float* oldG, int G_count, float* oldWeights, LossFunction lf){
 		//only for tanh
-		
-		if (outputLayer)
+
+		switch(lf)
 		{
-			
-			G = (output-target)*(1-math.squareFloat(output));
-			for (int i = 0; i < n_input; i++)
-			{
-				weight[i] = weight[i] - learningRate * G * prevOutput[i];
-			}
-		}else
-		{
-			for (int i = 0; i < G_count; i++)
-			{
-				G += oldG[i] * oldWeights[i];
-			}
-			G = G * (1-math.squareFloat(output));
-			for (int i = 0; i < n_input; i++)
-			{
-				weight[i] = weight[i] - learningRate * G * prevOutput[i];
-			}
+        case LossFunction::MeanSquare:
+            switch(activation)
+            {
+            case Functions::Tanh:
+                if (outputLayer)
+                {
+
+                    G = (output-target)*(1-math.squareFloat(output));
+                    for (int i = 0; i < n_input; i++)
+                    {
+                        weight[i] = weight[i] - learningRate * G * prevOutput[i];
+                    }
+                }else
+                {
+
+                    for (int i = 0; i < G_count; i++)
+                    {
+                        G += oldG[i] * oldWeights[i];
+                    }
+                    G = G * (1-math.squareFloat(output));
+
+
+
+                    for (int i = 0; i < n_input; i++)
+                    {
+                        weight[i] = weight[i] - learningRate * G * prevOutput[i];
+                    }
+
+                }
+            case Functions::Sigmoind:
+                if (outputLayer)
+                {
+
+                    G = (output-target)*(output-math.squareFloat(output));
+                    for (int i = 0; i < n_input; i++)
+                    {
+                        weight[i] = weight[i] - learningRate * G * prevOutput[i];
+                    }
+                }else
+                {
+
+                    for (int i = 0; i < G_count; i++)
+                    {
+                        G += oldG[i] * oldWeights[i];
+                    }
+                    G = G * (output-math.squareFloat(output));
+
+
+
+                    for (int i = 0; i < n_input; i++)
+                    {
+                        weight[i] = weight[i] - learningRate * G * prevOutput[i];
+                    }
+
+                }
+            }
 		}
 	}
-	
+
 	~Neuron() {
 		delete[] weight;
 	}
@@ -153,7 +198,7 @@ private:
 	float* biases;
 public:
 	NeuralNetwork(int* layers, float* n_biases) {
-		
+
 		p_layers = layers;
 		network.resize(layer_count);
 		biases = n_biases;
@@ -218,8 +263,8 @@ public:
 				prevOutput[x] = network[layer_count-2][x].output;
 			}
 			network[layer_count-1][i].Train(trainOutput[0][i], prevOutput, layers[layer_count-2], learningRate, true, nullptr, 0, nullptr);
-		}	
-		
+		}
+
 		for (int i = layer_count-2; i > -1; i--)
 		{
 			if(i==0){
@@ -234,14 +279,19 @@ public:
 				{
 					prevOutput[x] = network[i-1][x].output;
 				}
-				float* prevG=new float[layers[i+1]];
+
+				float* oldG=new float[layers[i+1]];
+				float* oldweight=new float[layers[i+1]];
 				for(int x = 0; x < layers[i+1]; x++){
-					prevG[x] = network[i+1][x].G;
+					oldG[x] = network[i+1][x].G;
 				}
 
 				for (int x = 0; x < layers[i]; x++)
 				{
-					network[i][x].Train(0, prevOutput, layers[i-1], learningRate, false, prevG, layers[i+1], network[i+1][x].weight);
+                    for(int z=0; z<layers[i+1]; z++){
+                        oldweight[z]=network[i+1][z].weight[x];
+                    }
+					network[i][x].Train(0, prevOutput, layers[i-1], learningRate, false, oldG, layers[i+1], oldweight);
 				}
 			}
 		}
@@ -250,23 +300,57 @@ public:
 	~NeuralNetwork() {   //destructor
 
 	}
-	
+
 };
+
 
 
 int main() {
 	std::cout << "Hello Ai" << std::endl;
-	int* layers = new int[layer_count] {2, 3, 1};
+
+    /*
+	int* layers = new int[layer_count] {2, 3, 2};
 	float* biases = new float[layer_count] {1, 1, 1};
 
 	NeuralNetwork nn(layers, biases);
 
 	float** train_in = new float* [1];
-	train_in[0] = new float[2]{ 1.0f, 2.0f };
+	train_in[0] = new float[layers[0]]{ 1.0f, 2.0f };
 
 	float** train_out = new float* [1];
-	train_out[0] = new float[1]{ 1.0f };
+	train_out[0] = new float[layers[layer_count-1]]{ 1.0f , 0.1f};
 
 
 	nn.Train(train_in, 2, train_out, 1, 1, 1, LossFunction::MeanSquare, layers, 1);
+    */
+
+
+	std::cout << "Load mnist data" << std::endl;
+
+	mnist::MNIST_dataset<std::vector, std::vector<float>, uint8_t> dataset = mnist::read_dataset<std::vector, std::vector, float, uint8_t>(mnist_location);
+    mnist::normalize_dataset(dataset);
+
+    std::cout<<dataset.training_images.size() << std::endl;;
+    std::cout<< dataset.training_images[0][0];
+
+
+    int* layers = new int[layer_count]{784, 50, 10};
+    float* biases = new float[layer_count] {1, 1, 1};
+
+    NeuralNetwork nn(layers, biases);
+
+    float** train_in = new float*[dataset.training_images.size()];
+    float** train_out = new float*[dataset.training_images.size()];
+
+
+    for(int i=0; i<dataset.training_images.size(); i++){
+        train_in[i]=&dataset.training_images[i][0];
+        train_out[i] = new float[1];
+        train_out[i][0]=(float)dataset.training_labels[i];
+    }
+
+    nn.Train(train_in, 784, train_out, dataset.training_images.size(), 0.1, 100, LossFunction::MeanSquare, layers, 5);
+
+    delete[] train_in;
+    delete[] train_out;
 }

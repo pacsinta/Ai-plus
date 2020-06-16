@@ -1,0 +1,13 @@
+# depslib dependency file v1.0
+1592234617 source:/home/patrik/Documents/Programming/Ai-plus/readfromMNIST.cpp
+
+1592238363 source:/home/patrik/Documents/Programming/Ai-plus/main.cpp
+	<iostream>
+	<math.h>
+	<vector>
+	<fstream>
+
+1592213368 /home/patrik/Documents/Programming/Ai-plus/readfromMNIST.cpp
+	<iostream>
+	<fstream>
+
