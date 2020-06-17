@@ -12,6 +12,11 @@
 #include "mnist/include/mnist/mnist_reader.hpp"
 #include "mnist/include/mnist/mnist_utils.hpp"
 
+
+
+//regularizer is missing
+
+
 enum class LossFunction {
 	//regression loss functions
 	MeanSquare = 0,  //working progress
@@ -40,9 +45,13 @@ enum class Functions {
 
 class Math {
 	public:
+
+        //Generate random float
 		float randomFloat(float min, float max) {
 			return (min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min))));
 		}
+
+        //Return x^2
 		float squareFloat(float x) {
 			return x * x;
 		}
@@ -53,6 +62,7 @@ class Math {
 
 class Log {
 public:
+    //Write all data from a float array to console
 	void logFloatPointerArray(float* arr, int size) {
 		std::ios_base::sync_with_stdio(false);
 
@@ -72,9 +82,11 @@ private:
 	Log log;
 public:
 	float* weight;
-	float output;
+	float output;  //Output with activation function
 	float bOutput; //before activation output
 	float G; //buffer for backprop
+
+
 	void init(unsigned int n_input, Functions n_activation, float n_bias) {
 		weight = new float[n_input];
 		for (unsigned int i = 0; i < n_input; i++)
@@ -208,9 +220,12 @@ private:
 	Math math;
 	Log log;
 	float* biases;
+	Functions f;
 public:
-	NeuralNetwork(int* layers, float* n_biases) {
+	NeuralNetwork(int* layers, float* n_biases, LossFunction n_lf, Functions n_f) {
 
+        lf = n_lf;
+        f=n_f;
 		p_layers = layers;
 		network.resize(layer_count);
 		biases = n_biases;
@@ -218,7 +233,7 @@ public:
 		network[0].resize(p_layers[0]);
 		for (int i = 0; i < p_layers[0]; i++)
 		{
-			network[0][i].init(1, Functions::Tanh, biases[0]);
+			network[0][i].init(1, f, biases[0]);
 		}
 
 		for (int i = 0; i < layer_count; i++)
@@ -227,10 +242,10 @@ public:
 
 			for (int x = 0; x < p_layers[i]; x++)
 			{
-				network[i][x].init(p_layers[i - 1], Functions::Tanh, biases[i]);
+				network[i][x].init(p_layers[i - 1], f, biases[i]);
 			}
 		}
-		lf = LossFunction::HingeLoss;
+
 	}
 	float* Run(float* inputs) {
 
@@ -256,57 +271,71 @@ public:
 				network[i][x].Run(outputs[i-1], p_layers[i - 1]);
 				outputs[i][x] = network[i][x].output;
 			}
-			//Log log;
-			//log.logFloatPointerArray(outputs[i], p_layers[i]);
 		}
 
 		return outputs[layer_count-1];
 	}
 
-	void Train(float** trainInput, int inputCount, float** trainOutput, int trainDataCount, float learningRate, int learningCount, LossFunction lossFunction, int* layers, unsigned int batches) {
-		Run(trainInput[0]);
+	void Train(float** trainInput, int inputCount, float** trainOutput, int trainDataCount, float learningRate, int learningCount, int* layers, unsigned int epochs) {
+		for(int a=0; a<epochs; a++){
+            for(int b=0; b<trainDataCount; b++){
+                Run(trainInput[b]);
 
-		//train Output layer
-		for (int i = 0; i < layers[layer_count-1]; i++)
-		{
-			float* prevOutput=new float[layers[layer_count-2]];
-			for(int x = 0; x < layers[layer_count-2]; x++)
-			{
-				prevOutput[x] = network[layer_count-2][x].output;
-			}
-			network[layer_count-1][i].Train(trainOutput[0][i], prevOutput, layers[layer_count-2], learningRate, true, nullptr, 0, nullptr, lf);
-		}
-
-		for (int i = layer_count-2; i > -1; i--)
-		{
-			if(i==0){
-				float* prevOutput=new float[inputCount];
-				for(int x = 0; x < inputCount; x++)
-				{
-					prevOutput[x] = trainInput[0][x];
-				}
-			}else{
-				float* prevOutput=new float[layers[i-1]];
-				for(int x = 0; x < layers[i-1]; x++)
-				{
-					prevOutput[x] = network[i-1][x].output;
-				}
-
-				float* oldG=new float[layers[i+1]];
-				float* oldweight=new float[layers[i+1]];
-				for(int x = 0; x < layers[i+1]; x++){
-					oldG[x] = network[i+1][x].G;
-				}
-
-				for (int x = 0; x < layers[i]; x++)
-				{
-                    for(int z=0; z<layers[i+1]; z++){
-                        oldweight[z]=network[i+1][z].weight[x];
+                //train Output layer
+                for (int i = 0; i < layers[layer_count-1]; i++)
+                {
+                    float* prevOutput=new float[layers[layer_count-2]];
+                    for(int x = 0; x < layers[layer_count-2]; x++)
+                    {
+                        prevOutput[x] = network[layer_count-2][x].output;
                     }
-					network[i][x].Train(0, prevOutput, layers[i-1], learningRate, false, oldG, layers[i+1], oldweight, lf);
-				}
-			}
+                    network[layer_count-1][i].Train(trainOutput[b][i], prevOutput, layers[layer_count-2], learningRate, true, nullptr, 0, nullptr, lf);
+                }
+
+                for (int i = layer_count-2; i > -1; i--)
+                {
+                    if(i==0){
+                        float* prevOutput=new float[inputCount];
+                        for(int x = 0; x < inputCount; x++)
+                        {
+                            prevOutput[x] = trainInput[b][x];
+                        }
+                    }else{
+                        float* prevOutput=new float[layers[i-1]];
+                        for(int x = 0; x < layers[i-1]; x++)
+                        {
+                            prevOutput[x] = network[i-1][x].output;
+                        }
+
+                        float* oldG=new float[layers[i+1]];
+                        float* oldweight=new float[layers[i+1]];
+                        for(int x = 0; x < layers[i+1]; x++){
+                            oldG[x] = network[i+1][x].G;
+                        }
+
+                        for (int x = 0; x < layers[i]; x++)
+                        {
+                            for(int z=0; z<layers[i+1]; z++){
+                                oldweight[z]=network[i+1][z].weight[x];
+                            }
+                            network[i][x].Train(0, prevOutput, layers[i-1], learningRate, false, oldG, layers[i+1], oldweight, lf);
+                        }
+                    }
+                }
+            }
 		}
+	}
+
+	void Test(float** testInputs, float** testOutput, int testDataCount, int* layers){
+        float averageloss=0;
+        Run(testInputs[0]);
+
+        switch(lf){
+        case LossFunction::MeanSquare:
+            for(int i=0; i<layers[layer_count-1]; i++){
+
+            }
+        }
 	}
 
 	~NeuralNetwork() {   //destructor
@@ -349,7 +378,7 @@ int main() {
     int* layers = new int[layer_count]{784, 50, 10};
     float* biases = new float[layer_count] {1, 1, 1};
 
-    NeuralNetwork nn(layers, biases);
+    NeuralNetwork nn(layers, biases, LossFunction::HingeLoss, Functions::Sigmoind);
 
     float** train_in = new float*[dataset.training_images.size()];
     float** train_out = new float*[dataset.training_images.size()];
@@ -362,8 +391,12 @@ int main() {
         std::cout<<train_out[i][0]<<std::endl;
     }
 
-    //nn.Train(train_in, 784, train_out, dataset.training_images.size(), 0.1, 100, LossFunction::MeanSquare, layers, 5);
+
+    std::cout<<"Train"<<std::endl;
+    nn.Train(train_in, 784, train_out, dataset.training_images.size(), 0.1, 100, layers, 5);
+
 
     delete[] train_in;
     delete[] train_out;
+    std::cout<<"Finished";
 }
