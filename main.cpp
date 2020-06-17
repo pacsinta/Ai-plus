@@ -13,12 +13,20 @@
 #include "mnist/include/mnist/mnist_utils.hpp"
 
 enum class LossFunction {
-	//regression losses
-	MeanSquare = 0,
+	//regression loss functions
+	MeanSquare = 0,  //working progress
+	MeanSquareLogarithmic = 1,
+	MeanAbsoluteError = 2,
 
-	//classification losses
-	HingeLoss = 1,
-	Simple = 2
+	//binary classification loss functions
+	HingeLoss = 3, //working progress
+	BinaryCrossEntropy = 4,
+	SquaredHingeLoss = 5,
+
+	//multy-class classification loss functions
+	MultyClassCrossEntropy = 6,
+	SparseMultiClassCrossEntropy = 7,
+	KullbackLeiblerDivergenceLoss = 8
 };
 
 enum class Functions {
@@ -135,13 +143,11 @@ public:
                     }
                 }else
                 {
-
                     for (int i = 0; i < G_count; i++)
                     {
                         G += oldG[i] * oldWeights[i];
                     }
                     G = G * (1-math.squareFloat(output));
-
 
 
                     for (int i = 0; i < n_input; i++)
@@ -176,6 +182,12 @@ public:
                     }
 
                 }
+            }
+        case LossFunction::HingeLoss:
+            switch(activation)
+            {
+                case Functions::Sigmoind:
+                    break;
             }
 		}
 	}
@@ -262,7 +274,7 @@ public:
 			{
 				prevOutput[x] = network[layer_count-2][x].output;
 			}
-			network[layer_count-1][i].Train(trainOutput[0][i], prevOutput, layers[layer_count-2], learningRate, true, nullptr, 0, nullptr);
+			network[layer_count-1][i].Train(trainOutput[0][i], prevOutput, layers[layer_count-2], learningRate, true, nullptr, 0, nullptr, lf);
 		}
 
 		for (int i = layer_count-2; i > -1; i--)
@@ -291,7 +303,7 @@ public:
                     for(int z=0; z<layers[i+1]; z++){
                         oldweight[z]=network[i+1][z].weight[x];
                     }
-					network[i][x].Train(0, prevOutput, layers[i-1], learningRate, false, oldG, layers[i+1], oldweight);
+					network[i][x].Train(0, prevOutput, layers[i-1], learningRate, false, oldG, layers[i+1], oldweight, lf);
 				}
 			}
 		}
@@ -347,9 +359,10 @@ int main() {
         train_in[i]=&dataset.training_images[i][0];
         train_out[i] = new float[1];
         train_out[i][0]=(float)dataset.training_labels[i];
+        std::cout<<train_out[i][0]<<std::endl;
     }
 
-    nn.Train(train_in, 784, train_out, dataset.training_images.size(), 0.1, 100, LossFunction::MeanSquare, layers, 5);
+    //nn.Train(train_in, 784, train_out, dataset.training_images.size(), 0.1, 100, LossFunction::MeanSquare, layers, 5);
 
     delete[] train_in;
     delete[] train_out;
