@@ -13,6 +13,8 @@
 #include "mnist/include/mnist/mnist_utils.hpp"
 
 
+//debug
+#include <cmath>
 
 //regularizer is missing
 
@@ -47,9 +49,16 @@ class Math {
 	public:
 
         //Generate random float
-		float randomFloat(float min, float max) {
+		float randomFloat2(float min, float max) {
 			return (min + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (max - min))));
 		}
+
+		float randomFloat(float a, float b) {
+            float random = ((float) rand()) / (float) RAND_MAX;
+            float diff = b - a;
+            float r = random * diff;
+            return a + r;
+        }
 
         //Return x^2
 		float squareFloat(float x) {
@@ -58,7 +67,32 @@ class Math {
 };
 
 
-
+class Debug{
+private:
+    int db=0;
+public:
+    float* array_buff;
+    void testMatch(float* array2, int count, bool print){
+        for(int i=0; i<count; i++){
+            if(array_buff[i]==array2[i]){
+                db++;
+                if(print){
+                    std::cout<<array_buff[i] << " " << array2[i] << std::endl;
+                }
+            }
+        }
+        std::cout<<db<<std::endl;
+    }
+    bool testNan(float* array1, int size){
+        for(int i=0; i<size; i++){
+            if(isnan(array1[i])){
+                std::cout<<"Nan finded"<<std::endl;
+                return true;
+            }
+        }
+        return false;
+    }
+};
 
 class Log {
 public:
@@ -92,9 +126,8 @@ public:
 		for (unsigned int i = 0; i < n_input; i++)
 		{
 			weight[i] = math.randomFloat(-1.0f, 1.0f);
-			//std::cout << weight[i] << " ";
+
 		}
-		//std::cout << std::endl;
 		activation = n_activation;
 		bias = n_bias;
 	}
@@ -104,14 +137,27 @@ public:
 		for (unsigned int i = 0; i < n_input; i++)
 		{
 			bOutput += inputs[i] * weight[i];
+			if(isnan(bOutput)){
+                std::cout<<inputs[i]<<std::endl;
+                std::cout<<weight[i]<<std::endl;
+                std::cout<<" "<<std::endl;
+			}
 		}
 
-		bOutput += bias;
+		bOutput = bias+bOutput;
 
 		switch (activation)
 		{
 		case Functions::Sigmoind:
 			output = (1.0f / (1.0f + (float)exp(-bOutput)));
+
+            if(output<0){
+                std::cout<<output<<std::endl;
+            }
+			if(isnan(output)){
+                std::cout<<bOutput<<std::endl;
+                std::cout<<" "<<std::endl;
+			}
 		case Functions::ReLu:
 			if (bOutput < 0)
 			{
@@ -153,6 +199,7 @@ public:
                     {
                         weight[i] = weight[i] - learningRate * G * prevOutput[i];
                     }
+
                 }else
                 {
                     for (int i = 0; i < G_count; i++)
@@ -173,10 +220,25 @@ public:
                 {
 
                     G = (output-target)*(output-math.squareFloat(output));
+                    log.logFloatPointerArray(prevOutput, n_input);
+                    if(isnan(G)){
+                        std::cout<<output<<std::endl;
+
+                        std::cout<<std::endl;
+                    }
+                    Debug db;
+                    db.array_buff=weight;
                     for (int i = 0; i < n_input; i++)
                     {
+                        //std::cout<<weight[i]<<std::endl;
                         weight[i] = weight[i] - learningRate * G * prevOutput[i];
+                        //std::cout<<weight[i]<<std::endl;
+                        //std::cout<<G<<std::endl;
+                        std::cout<<prevOutput[i]<<std::endl;
                     }
+
+                    db.testMatch(weight, n_input, true);
+
                 }else
                 {
 
@@ -190,7 +252,18 @@ public:
 
                     for (int i = 0; i < n_input; i++)
                     {
+
+                        float buff=weight[i];
+
                         weight[i] = weight[i] - learningRate * G * prevOutput[i];
+
+                        if(isnan(weight[i])){
+                            std::cout<<G<<std::endl;
+                            std::cout<<buff<<std::endl;
+                            std::cout<<prevOutput[i]<<std::endl;
+                            std::cout<<(prevOutput[i]*G)<<std::endl;
+                            std::cout<<" "<<std::endl;
+                        }
                     }
 
                 }
@@ -203,10 +276,6 @@ public:
             }
 		}
 	}
-
-	~Neuron() {
-		delete[] weight;
-	}
 };
 
 
@@ -214,7 +283,7 @@ public:
 
 class NeuralNetwork {
 private:
-	std::vector<std::vector<Neuron>> network;
+
 	int* p_layers;
 	LossFunction lf;
 	Math math;
@@ -222,6 +291,7 @@ private:
 	float* biases;
 	Functions f;
 public:
+    std::vector<std::vector<Neuron>> network;
 	NeuralNetwork(int* layers, float* n_biases, LossFunction n_lf, Functions n_f) {
 
         lf = n_lf;
@@ -236,7 +306,7 @@ public:
 			network[0][i].init(1, f, biases[0]);
 		}
 
-		for (int i = 0; i < layer_count; i++)
+		for (int i = 1; i < layer_count; i++)
 		{
 			network[i].resize(p_layers[i]);
 
@@ -245,7 +315,6 @@ public:
 				network[i][x].init(p_layers[i - 1], f, biases[i]);
 			}
 		}
-
 	}
 	float* Run(float* inputs) {
 
@@ -260,14 +329,16 @@ public:
 			outputs[0][i] = network[0][i].output;
 		}
 
-
-
 		for (int i = 1; i < layer_count; i++)
 		{
 			outputs[i] = new float[p_layers[i]];
 			//std::cout << (p_layers[i] - 1) << std::endl;
 			for (int x = 0; x < p_layers[i]; x++)
 			{
+                Debug db;
+                if(db.testNan(outputs[i-1], p_layers[i - 1])){
+                    int am=0;
+                }
 				network[i][x].Run(outputs[i-1], p_layers[i - 1]);
 				outputs[i][x] = network[i][x].output;
 			}
@@ -318,10 +389,12 @@ public:
                             for(int z=0; z<layers[i+1]; z++){
                                 oldweight[z]=network[i+1][z].weight[x];
                             }
+
                             network[i][x].Train(0, prevOutput, layers[i-1], learningRate, false, oldG, layers[i+1], oldweight, lf);
                         }
                     }
                 }
+
             }
 		}
 	}
@@ -372,31 +445,71 @@ int main() {
     mnist::normalize_dataset(dataset);
 
     std::cout<<dataset.training_images.size() << std::endl;;
-    std::cout<< dataset.training_images[0][0];
 
 
     int* layers = new int[layer_count]{784, 50, 10};
-    float* biases = new float[layer_count] {1, 1, 1};
+    float* biases = new float[layer_count] {0.5, 0.5, 0.5};
 
-    NeuralNetwork nn(layers, biases, LossFunction::HingeLoss, Functions::Sigmoind);
+    NeuralNetwork nn(layers, biases, LossFunction::MeanSquare, Functions::Sigmoind);
+
+
+
+
 
     float** train_in = new float*[dataset.training_images.size()];
-    float** train_out = new float*[dataset.training_images.size()];
-
+    float** train_out = new float*[dataset.training_labels.size()];
+    float** test_in = new float*[dataset.test_images.size()];
+    float** test_out = new float*[dataset.test_labels.size()];
 
     for(int i=0; i<dataset.training_images.size(); i++){
         train_in[i]=&dataset.training_images[i][0];
-        train_out[i] = new float[1];
-        train_out[i][0]=(float)dataset.training_labels[i];
-        std::cout<<train_out[i][0]<<std::endl;
+        train_out[i] = new float[10];
+        for(int x=0; x<10; x++){
+            train_out[i][x]=0;
+        }
+        train_out[i][int(dataset.training_labels[i])-1]=1.0f;
     }
+
+    for(int i=0; i<dataset.test_images.size(); i++){
+        test_in[i]=&dataset.test_images[i][0];
+        test_out[i] = new float[10];
+        for(int x=0; x<10; x++){
+            test_out[i][x]=0;
+        }
+        test_out[i][int(dataset.test_labels[i])-1]=1.0f;
+    }
+
+
+
+    nn.Run(test_in[1]);
+
+    /*for(int i = 0; i<10; i++){
+        std::cout<<nn.network[layer_count-1][i].output<<std::endl;
+    }*/
 
 
     std::cout<<"Train"<<std::endl;
     nn.Train(train_in, 784, train_out, dataset.training_images.size(), 0.1, 100, layers, 5);
 
+    nn.Run(test_in[1]);
+
+
+    float max=0;
+    int output=0;
+    for(int i = 0; i<10; i++){
+        std::cout<<nn.network[layer_count-1][i].output<<std::endl;
+        if(nn.network[layer_count-1][i].output > max){
+            max=nn.network[layer_count-1][i].output;
+            output=i+1;
+        }
+    }
+
+    std::cout << "output: " << output << std::endl;
+    std::cout << "target: " << (int)dataset.test_labels[1] << std::endl;
+
 
     delete[] train_in;
     delete[] train_out;
+    nn.network.clear();
     std::cout<<"Finished";
 }

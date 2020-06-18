@@ -1,13 +1,30 @@
 # depslib dependency file v1.0
 1592234617 source:/home/patrik/Documents/Programming/Ai-plus/readfromMNIST.cpp
 
-1592238363 source:/home/patrik/Documents/Programming/Ai-plus/main.cpp
+1592435207 source:/home/patrik/Documents/Programming/Ai-plus/main.cpp
 	<iostream>
 	<math.h>
 	<vector>
 	<fstream>
+	"mnist/include/mnist/mnist_reader.hpp"
+	"mnist/include/mnist/mnist_utils.hpp"
+	<cmath>
 
 1592213368 /home/patrik/Documents/Programming/Ai-plus/readfromMNIST.cpp
 	<iostream>
 	<fstream>
+
+1592298268 /home/patrik/Documents/Programming/Ai-plus/mnist/include/mnist/mnist_reader.hpp
+	<fstream>
+	<iostream>
+	<string>
+	<vector>
+	<cstdint>
+	<memory>
+	"mnist_reader_common.hpp"
+
+1592298268 /home/patrik/Documents/Programming/Ai-plus/mnist/include/mnist/mnist_reader_common.hpp
+
+1592298268 /home/patrik/Documents/Programming/Ai-plus/mnist/include/mnist/mnist_utils.hpp
+	<cmath>
 
